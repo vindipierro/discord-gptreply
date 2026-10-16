@@ -2,7 +2,7 @@ import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { copyToClipboard } from "@utils/clipboard";
 import definePlugin from "@utils/types";
 import type { Message } from "@vencord/discord-types";
-import { ChannelStore, ComponentDispatch, SelectedChannelStore, showToast, Toasts } from "@webpack/common";
+import { ChannelStore, ComponentDispatch, SelectedChannelStore, showToast } from "@webpack/common";
 
 import { getConversationHistory, rememberMessage } from "./history";
 import { buildPrompt } from "./prompt";
@@ -31,13 +31,13 @@ async function pasteClipboardIntoComposer(channelId: string) {
 
     const text = (await navigator.clipboard.readText()).trim();
     if (!text) {
-        showToast("Clipboard is empty.", Toasts.Type.FAILURE);
+        showToast({ text: "Clipboard is empty.", variant: "critical" });
         return;
     }
 
     insertIntoComposer(text);
     activeSession = null;
-    showToast("Draft inserted. Review it before sending.", Toasts.Type.SUCCESS);
+    showToast({ text: "Draft inserted. Review it before sending.", variant: "success" });
 }
 
 async function prepareDraft(channelId: string) {
@@ -46,7 +46,7 @@ async function prepareDraft(channelId: string) {
 
     const messages = await getConversationHistory(channelId);
     if (!messages.length) {
-        showToast("No DM context is available yet.", Toasts.Type.FAILURE);
+        showToast({ text: "No DM context is available yet.", variant: "critical" });
         return;
     }
 
@@ -55,7 +55,10 @@ async function prepareDraft(channelId: string) {
 
     copyToClipboard(prompt);
     VencordNative.native.openExternal("https://chatgpt.com/");
-    showToast(`Copied context from ${messages.length} messages. Paste it into ChatGPT, then copy the draft.`, Toasts.Type.SUCCESS);
+    showToast({
+        text: `Copied context from ${messages.length} messages. Paste it into ChatGPT, then copy the draft.`,
+        variant: "success"
+    });
 }
 
 async function handleDiscordFocus() {
@@ -69,7 +72,7 @@ async function handleDiscordFocus() {
 
         insertIntoComposer(clipboard);
         activeSession = null;
-        showToast("ChatGPT draft inserted. Review it before sending.", Toasts.Type.SUCCESS);
+        showToast({ text: "ChatGPT draft inserted. Review it before sending.", variant: "success" });
     } catch {
         return;
     }
