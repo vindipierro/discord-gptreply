@@ -6,8 +6,8 @@ Private Vencord userplugin for drafting Discord DM replies with your normal Chat
 
 1. Open a 1:1 Discord DM.
 2. Click the sparkle beside the composer, or hover a message and click the sparkle.
-3. The plugin builds a prompt from the DM context it has locally, copies it, and opens ChatGPT.
-4. Paste the prompt into ChatGPT and send it.
+3. The plugin loads cached context and, on first use for that DM, backfills older messages.
+4. It builds a reply prompt, copies it as a fallback, and opens ChatGPT with the prompt prefilled.
 5. Copy ChatGPT's proposed reply.
 6. Switch back to Discord.
 7. The plugin inserts the copied draft into the current DM composer automatically.
@@ -19,11 +19,21 @@ You can also right-click the sparkle beside the composer to insert the current c
 
 ## History behavior
 
-The plugin keeps a local per-DM history using Vencord DataStore and also seeds that history from Discord's current MessageStore cache whenever you generate a draft.
+The plugin keeps a local per-DM history using Vencord DataStore and seeds it from Discord's current MessageStore cache.
 
-It keeps up to 2,500 locally observed messages per DM. Prompt generation considers at most one year of history, then takes up to 1,000 of the newest messages subject to a roughly 70,000-character context cap.
+When a DM has not been backfilled yet, the plugin also pages backward through the conversation in batches of 100 messages. It currently targets up to roughly 1,200 messages or one year of history, whichever comes first.
 
-This first version does not perform a bulk historical Discord API backfill. That is intentionally separated from the drafting UI so the history source can be changed without rewriting the rest of the plugin.
+The local store retains up to 2,500 messages per DM. Prompt generation can use up to 1,000 of the newest stored messages subject to a roughly 70,000-character context cap.
+
+Once the initial backfill is complete, later drafts reuse the stored history and continue learning from new messages observed by Discord.
+
+## ChatGPT handoff
+
+The prompt is copied to the clipboard as a fallback and included when ChatGPT is opened so it can appear in the ChatGPT composer automatically.
+
+Short prompts use ChatGPT's normal `?q=` prefill URL. Larger prompts use the URL fragment form to avoid sending an oversized HTTP query string.
+
+Depending on ChatGPT's current web behavior, a prefilled prompt may remain in the composer or may be submitted automatically. The plugin does not automate or extract the ChatGPT response.
 
 ## Install
 
@@ -53,7 +63,7 @@ After Discord launches:
 ## Files
 
 - `index.tsx`: Discord UI, ChatGPT handoff, clipboard return flow
-- `history.ts`: local DM context storage and MessageStore seeding
+- `history.ts`: local DM storage, cache seeding, and historical backfill
 - `prompt.ts`: context trimming and ChatGPT prompt generation
 - `types.ts`: message serialization
 
@@ -61,4 +71,4 @@ After Discord launches:
 
 The local history is stored through Vencord's DataStore on your machine. Nothing in this plugin sends that history to a custom server.
 
-When you click Draft, the generated context prompt is placed on your clipboard. You decide whether to paste and submit it to ChatGPT.
+When you click Draft, the generated context is copied to your clipboard and passed to ChatGPT through the launch URL. Your browser may retain that URL in its local browsing history. The draft is only inserted back into Discord after you copy it, and the plugin never sends the Discord message for you.
