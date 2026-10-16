@@ -26,6 +26,16 @@ function insertIntoComposer(text: string) {
     ComponentDispatch.dispatch("INSERT_TEXT", { rawText: text });
 }
 
+function chatGPTUrl(prompt: string) {
+    const encoded = encodeURIComponent(prompt);
+
+    if (encoded.length <= 8000) {
+        return `https://chatgpt.com/?q=${encoded}`;
+    }
+
+    return `https://chatgpt.com/#?q=${encoded}`;
+}
+
 async function pasteClipboardIntoComposer(channelId: string) {
     if (SelectedChannelStore.getChannelId() !== channelId) return;
 
@@ -44,6 +54,8 @@ async function prepareDraft(channelId: string) {
     const channel = ChannelStore.getChannel(channelId);
     if (!channel?.isDM?.()) return;
 
+    showToast({ text: "Loading DM context...", variant: "default" });
+
     const messages = await getConversationHistory(channelId);
     if (!messages.length) {
         showToast({ text: "No DM context is available yet.", variant: "critical" });
@@ -54,9 +66,9 @@ async function prepareDraft(channelId: string) {
     activeSession = { channelId, prompt };
 
     copyToClipboard(prompt);
-    VencordNative.native.openExternal("https://chatgpt.com/");
+    VencordNative.native.openExternal(chatGPTUrl(prompt));
     showToast({
-        text: `Copied context from ${messages.length} messages. Paste it into ChatGPT, then copy the draft.`,
+        text: `Opened ChatGPT with context from ${messages.length} messages. Copy the draft when it is ready.`,
         variant: "success"
     });
 }
