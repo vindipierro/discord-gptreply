@@ -5,7 +5,9 @@ import type { Message } from "@vencord/discord-types";
 import { ChannelStore, ComponentDispatch, SelectedChannelStore, showToast } from "@webpack/common";
 
 import { getConversationHistory, rememberMessage } from "./history";
-import { buildPrompt } from "./prompt";
+import { buildContextFile, buildInstructionPrompt } from "./prompt";
+
+const Native = VencordNative.pluginHelpers.ReplyWithChatGPT as PluginNative<typeof import("./native")>;
 
 interface DraftSession {
     channelId: string;
@@ -27,13 +29,7 @@ function insertIntoComposer(text: string) {
 }
 
 function chatGPTUrl(prompt: string) {
-    const encoded = encodeURIComponent(prompt);
-
-    if (encoded.length <= 8000) {
-        return `https://chatgpt.com/?q=${encoded}`;
-    }
-
-    return `https://chatgpt.com/#?q=${encoded}`;
+    return `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`;
 }
 
 async function pasteClipboardIntoComposer(channelId: string) {
@@ -62,13 +58,23 @@ async function prepareDraft(channelId: string) {
         return;
     }
 
-    const prompt = buildPrompt(channelId, messages);
-    activeSession = { channelId, prompt };
+    const prompt = buildInstructionPrompt(channelId);
+    const contextFile = buildContextFile(channelId, messages);
 
+    try {
+        await Native.writeContextFile(contextFile);
+        await Native.revealContextFile();
+    } catch {
+        showToast({ text: "Could not create the ChatGPT context file.", variant: "critical" });
+        return;
+    }
+
+    activeSession = { channelId, prompt };
     copyToClipboard(prompt);
     VencordNative.native.openExternal(chatGPTUrl(prompt));
+
     showToast({
-        text: `Opened ChatGPT with context from ${messages.length} messages. Copy the draft when it is ready.`,
+        text: `Loaded ${messages.length} messages into discord-gptreply-context.txt in Downloads. Attach that file in ChatGPT.`,
         variant: "success"
     });
 }
