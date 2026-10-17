@@ -7,11 +7,13 @@ Private Vencord userplugin for drafting Discord DM replies with your normal Chat
 1. Open a 1:1 Discord DM.
 2. Click the sparkle beside the composer, or hover a message and click the sparkle.
 3. The plugin loads cached context and, on first use for that DM, backfills older messages.
-4. It builds a reply prompt, copies it as a fallback, and opens ChatGPT with the prompt prefilled.
-5. Copy ChatGPT's proposed reply.
-6. Switch back to Discord.
-7. The plugin inserts the copied draft into the current DM composer automatically.
-8. Review or edit it, then send it yourself.
+4. It writes the conversation history to `discord-gptreply-context.txt` in your Downloads folder.
+5. Finder reveals that file and ChatGPT opens with a short drafting instruction prefilled.
+6. Attach `discord-gptreply-context.txt` to ChatGPT.
+7. Copy ChatGPT's proposed reply.
+8. Switch back to Discord.
+9. The plugin inserts the copied draft into the current DM composer automatically.
+10. Review or edit it, then send it yourself.
 
 The plugin never presses Enter or sends a Discord message.
 
@@ -23,17 +25,19 @@ The plugin keeps a local per-DM history using Vencord DataStore and seeds it fro
 
 When a DM has not been backfilled yet, the plugin also pages backward through the conversation in batches of 100 messages. It currently targets up to roughly 1,200 messages or one year of history, whichever comes first.
 
-The local store retains up to 2,500 messages per DM. Prompt generation can use up to 1,000 of the newest stored messages subject to a roughly 70,000-character context cap.
+The local store retains up to 2,500 messages per DM. The generated context file contains the available stored conversation history from the last year, ordered from oldest to newest.
 
 Once the initial backfill is complete, later drafts reuse the stored history and continue learning from new messages observed by Discord.
 
 ## ChatGPT handoff
 
-The prompt is copied to the clipboard as a fallback and included when ChatGPT is opened so it can appear in the ChatGPT composer automatically.
+Large conversation histories are not placed into the ChatGPT URL or pasted into the ChatGPT composer. Instead, the plugin creates `discord-gptreply-context.txt` in Downloads and only sends a short instruction prompt to ChatGPT.
 
-Short prompts use ChatGPT's normal `?q=` prefill URL. Larger prompts use the URL fragment form to avoid sending an oversized HTTP query string.
+The generated file is overwritten on each draft instead of creating a new file every time.
 
-Depending on ChatGPT's current web behavior, a prefilled prompt may remain in the composer or may be submitted automatically. The plugin does not automate or extract the ChatGPT response.
+The instruction tells ChatGPT to wait if the context file has not been attached yet, so it is safe if ChatGPT submits the prefilled instruction immediately instead of leaving it in the composer.
+
+The short instruction is also copied to the clipboard as a fallback. The plugin does not automate or extract the ChatGPT response.
 
 ## Install
 
@@ -63,12 +67,13 @@ After Discord launches:
 ## Files
 
 - `index.tsx`: Discord UI, ChatGPT handoff, clipboard return flow
+- `native.ts`: writes and reveals the local ChatGPT context file
 - `history.ts`: local DM storage, cache seeding, and historical backfill
-- `prompt.ts`: context trimming and ChatGPT prompt generation
+- `prompt.ts`: builds the short ChatGPT instruction and text-file transcript
 - `types.ts`: message serialization
 
 ## Privacy
 
 The local history is stored through Vencord's DataStore on your machine. Nothing in this plugin sends that history to a custom server.
 
-When you click Draft, the generated context is copied to your clipboard and passed to ChatGPT through the launch URL. Your browser may retain that URL in its local browsing history. The draft is only inserted back into Discord after you copy it, and the plugin never sends the Discord message for you.
+When you click Draft, the conversation history is written to `discord-gptreply-context.txt` in your Downloads folder. It only reaches ChatGPT when you attach the file yourself. The draft is only inserted back into Discord after you copy it, and the plugin never sends the Discord message for you.
