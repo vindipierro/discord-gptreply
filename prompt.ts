@@ -2,41 +2,23 @@ import { ChannelStore, UserStore } from "@webpack/common";
 
 import type { StoredMessage } from "./types";
 
-const MAX_MESSAGES = 1000;
-const MAX_CONTEXT_CHARS = 70000;
-
-function trimHistory(messages: StoredMessage[]) {
-    const selected: StoredMessage[] = [];
-    let chars = 0;
-
-    for (let index = messages.length - 1; index >= 0 && selected.length < MAX_MESSAGES; index--) {
-        const message = messages[index];
-        const cost = message.content.length + message.authorName.length + 16;
-
-        if (selected.length > 0 && chars + cost > MAX_CONTEXT_CHARS) break;
-
-        selected.push(message);
-        chars += cost;
-    }
-
-    return selected.reverse();
-}
-
-export function buildPrompt(channelId: string, messages: StoredMessage[]) {
+function getParticipants(channelId: string) {
     const me = UserStore.getCurrentUser();
     const channel = ChannelStore.getChannel(channelId);
     const otherId = channel?.recipients?.find(id => id !== me.id) ?? channel?.recipients?.[0];
     const other = otherId ? UserStore.getUser(otherId) : undefined;
-    const myName = me.globalName ?? me.username;
-    const otherName = other?.globalName ?? other?.username ?? "the other person";
-    const history = trimHistory(messages);
 
-    const transcript = history.map(message => {
-        const speaker = message.authorId === me.id ? "ME" : "THEM";
-        return `${speaker}: ${message.content}`;
-    }).join("\n");
+    return {
+        me,
+        myName: me.globalName ?? me.username,
+        otherName: other?.globalName ?? other?.username ?? "the other person"
+    };
+}
 
-    return `Draft my next Discord DM reply.
+export function buildInstructionPrompt(channelId: string) {
+    const { myName, otherName } = getParticipants(channelId);
+
+    return `Draft my next Discord DM reply using the attached file \`discord-gptreply-context.txt\` as the conversation history.
 
 I am ${myName}. I am talking to ${otherName}.
 
@@ -44,9 +26,25 @@ Infer how I naturally communicate with this specific person from the conversatio
 
 Do not make me sound more polished, formal, enthusiastic, affectionate, or verbose than I normally sound with this person. Do not invent facts, plans, feelings, or commitments that are not supported by the conversation. If the newest messages do not require a reply, still give the most natural short response I would plausibly send.
 
-Return ONLY the proposed message text. No quotation marks, no explanation, no label, and no markdown.
+If the context file has not been attached yet, wait for it before answering.
 
-Conversation history, oldest to newest:
+Return ONLY the proposed message text. No quotation marks, no explanation, no label, and no markdown.`;
+}
 
-${transcript}`;
+export function buildContextFile(channelId: string, messages: StoredMessage[]) {
+    const { me, myName, otherName } = getParticipants(channelId);
+
+    const transcript = messages.map(message => {
+        const speaker = message.authorId === me.id ? "ME" : "THEM";
+        return `${speaker}: ${message.content}`;
+    }).join("\n");
+
+    return `Discord DM conversation context
+
+ME: ${myName}
+THEM: ${otherName}
+Messages: ${messages.length}
+Order: oldest to newest
+
+${transcript}\n`;
 }
